@@ -80,7 +80,7 @@ def make_contreras_snail(label="snail",
 
     # find the indices of the vertices and their faces that will be used for Blender mesh conversion
     indices = np.array(range(n_points_aperture*n_points_time))
-    index_grid = indices.reshape(n_points_time, n_points_aperture).T
+    index_grid = indices.reshape(n_points_time, n_points_aperture)
     v1 = index_grid[:, :-1]                       
     v2 = index_grid[:, 1:]                         
     v3 = np.roll(index_grid, -1, axis=0)[:, 1:]     
@@ -103,8 +103,8 @@ snail = make_contreras_snail(z = 1.3, a = 1, d=1, phi=0, psi=0,
                              b=.15,
                              n_depth=0, n=0, 
                              c_n=0, c_depth=0,  
-                             time=200, n_points_time=950, 
-                             n_points_aperture=1000, 
+                             time=200, n_points_time=500, 
+                             n_points_aperture=500, 
                              h_0 = 40, eps=.8)
                              
                              
@@ -142,3 +142,12 @@ obj.scale = (scaling_factor, scaling_factor, scaling_factor)
 
 # Update the view layer to reflect changes
 bpy.context.view_layer.update()
+
+
+
+
+
+
+
+
+
