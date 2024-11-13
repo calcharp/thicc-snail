@@ -80,22 +80,34 @@ def make_contreras_snail(label="snail",
 
     # find the indices of the vertices and their faces that will be used for Blender mesh conversion
     indices = np.array(range(n_points_aperture*n_points_time))
+    inner_indices = indices + (n_points_aperture*n_points_time)
     index_grid = indices.reshape(n_points_time, n_points_aperture)
     v1 = index_grid[:, :-1]                       
     v2 = index_grid[:, 1:]                         
     v3 = np.roll(index_grid, -1, axis=0)[:, 1:]     
     v4 = np.roll(index_grid, -1, axis=0)[:, :-1]    
+    
+    # have inner and outer vertices into one array
+    outer_mesh_vertices = outer_mesh.reshape(3, n_points_aperture*n_points_time)
+    inner_mesh_vertices = inner_mesh.reshape(3, n_points_aperture*n_points_time)
+
     # Stack the adjusted indices to form faces with vertical wrapping
-    faces = np.stack((v1, v2, v3, v4), axis=-1).reshape(-1, 4)
+    outer_mesh_faces = np.stack((v1, v2, v3, v4), axis=-1).reshape(-1, 4)
+    inner_mesh_faces = outer_mesh_faces + (n_points_aperture*n_points_time)
+    
+
+    vertices = np.concatenate((outer_mesh_vertices, inner_mesh_vertices), axis=1)
+    faces = np.concatenate((outer_mesh_faces, inner_mesh_faces), axis=0)
+
 
     # Reshape the inner and outer meshes so their shapes are compatable with Blender
     return {"label": label,
-            "outer_mesh" : outer_mesh, 
-            "inner_mesh" : inner_mesh,
-            "outer_mesh_vertices": outer_mesh.reshape(3, n_points_aperture*n_points_time),
-            "inner_mesh_vertices": inner_mesh.reshape(3, n_points_aperture*n_points_time),
+            "vertices": vertices,
             "vertex_indices": indices,
-            "face_vertex_indices": faces
+            "face_vertex_indices": faces,
+            "outer_mesh_vertices": outer_mesh_vertices,
+            "inner_mesh_vertices": inner_mesh_vertices,
+            "inner_indices": inner_indices
             }
             
 
@@ -108,7 +120,7 @@ snail = make_contreras_snail(z = 1.3, a = 1, d=1, phi=0, psi=0,
                              h_0 = 40, eps=.8)
                              
                              
-verts = snail['outer_mesh_vertices'].T.tolist()
+verts = snail['vertices'].T.tolist()
 faces = snail['face_vertex_indices'].tolist()
 label = snail['label']
 
