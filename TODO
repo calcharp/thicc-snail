@@ -3,3 +3,26 @@ Find new ribbing patterns
 
 Optimal Okabe thickness parameter for Oreohelix is probably ~0.8. 
 Figure out starting thickness values.
+
+
+
+
+Get this to work: 
+# indexes = np.arange(n_points_aperture*n_points_time)
+# inner_indexes = indexes[(indexes + 1) % n_points_aperture != 0]
+# outer_indexes = np.setdiff1d(indexes, inner_indexes)
+
+# expanded_inner_indexes = np.stack([
+#     inner_indexes,
+#     inner_indexes + 1,
+#     inner_indexes + n_points_aperture,
+#     inner_indexes + n_points_aperture + 1
+# ], axis=1)
+# expanded_outer_indexes = np.stack([
+#     outer_indexes,
+#     (outer_indexes - n_points_aperture) + 1,
+#     outer_indexes + n_points_aperture,
+#     outer_indexes + 1
+# ], axis=1)
+# expanded_indexes = np.concatenate([expanded_inner_indexes, expanded_outer_indexes], axis=0)
+# faces = expanded_indexes.tolist()

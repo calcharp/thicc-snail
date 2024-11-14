@@ -92,7 +92,7 @@ def make_contreras_snail(label="snail",
             }
 
 n_points_time=400
-n_points_aperture=50
+n_points_aperture=10
 
 snail = make_contreras_snail(z = 1.3, a = 1, d=1, phi=0, psi=0,
                              b=.15,
@@ -108,22 +108,45 @@ inner_verts = snail['inner_mesh']
 label = snail['label']
 
 def add_snail_faces_and_groups(label, outer_verts, inner_verts, n_points_time, n_points_aperture):
+    # Helper function to create faces for a mesh based on its vertices
     def create_faces(n_points_time, n_points_aperture):
         faces = []
         
-        # Main loop for creating quad faces along the shell, avoiding connections at the last aperture column
+        # Main loop for creating quad faces
         for t in range(n_points_time - 1):
-            for a in range(n_points_aperture - 1):  # Stop before the last point in aperture to avoid closure
+            for a in range(n_points_aperture - 1):
                 bottom_left = t * n_points_aperture + a
                 bottom_right = bottom_left + 1
                 top_left = bottom_left + n_points_aperture
                 top_right = top_left + 1
                 faces.append([bottom_left, bottom_right, top_right, top_left])
+        
+        # Wrap-around faces for last column
+        for t in range(n_points_time - 1):
+            bottom_left = t * n_points_aperture + (n_points_aperture - 1)
+            bottom_right = t * n_points_aperture
+            top_left = bottom_left + n_points_aperture
+            top_right = top_left - (n_points_aperture - 1)
+            faces.append([bottom_left, bottom_right, top_right, top_left])
 
-        # Skip faces for the last row in time, effectively leaving it open
+        # Wrap-around faces for last row
+        for a in range(n_points_aperture - 1):
+            bottom_left = (n_points_time - 1) * n_points_aperture + a
+            bottom_right = bottom_left + 1
+            top_left = a
+            top_right = a + 1
+            faces.append([bottom_left, bottom_right, top_right, top_left])
+
+        # Corner face to connect the last vertex of last row to the first
+        bottom_left = (n_points_time - 1) * n_points_aperture + (n_points_aperture - 1)
+        bottom_right = (n_points_time - 1) * n_points_aperture
+        top_left = n_points_aperture - 1
+        top_right = 0
+        faces.append([bottom_left, bottom_right, top_right, top_left])
+
         return faces
 
-    # Generate faces for both inner and outer meshes without the last row or aperture wrap-around
+    # Generate faces for both inner and outer meshes
     outer_faces = create_faces(n_points_time, n_points_aperture)
     inner_faces = create_faces(n_points_time, n_points_aperture)
     
@@ -155,6 +178,8 @@ def add_snail_faces_and_groups(label, outer_verts, inner_verts, n_points_time, n
     return obj
 
 
+
+# Call function to create the object with vertex groups
 obj = add_snail_faces_and_groups(label, outer_verts, inner_verts, n_points_time, n_points_aperture)
 
 # Apply material (optional, similar to previous setup)
