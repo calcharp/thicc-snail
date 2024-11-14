@@ -6,13 +6,10 @@ def make_contreras_snail(label="snail",
                          c_depth=0.1, c_n = 10, n_depth = 0, n = 0, 
                          h_0 = 1, eps = 0.5,
                          time = 20, n_points_time = 1000, 
-                         n_points_aperture=100):
+                         n_points_aperture=15):
 
     # snail axes are [XYZ][Aperture Angle Theta][Time]
-
-    _lambda: np.array = np.zeros((3, n_points_time, n_points_aperture))
     gamma: np.array = np.zeros((3, n_points_time, n_points_aperture))
-    C: np.array = np.zeros((3, n_points_time, n_points_aperture))
 
     # vector of points in time reshaped for broadcasting
     t: np.array = np.linspace(0, time, n_points_time).reshape((n_points_time, 1))
@@ -28,7 +25,6 @@ def make_contreras_snail(label="snail",
 
     radial_ribbing = (1 + n_depth + n_depth*np.sin(n*theta))
     spiral_ribbing = (1 + c_depth + c_depth*np.sin(c_n*t))
-    #spiral_ribbing = 1 + c_depth + (c_depth*np.sin(c_n*t)) + np.abs((c_depth*np.sin(c_n*t)))
 
     # shape = (3, n_points_time, 1) -> [xyz][ti)me][constant with respect to the angle theta along the aperture]
     gamma = np.exp(b*t)*np.array([
@@ -75,59 +71,105 @@ def make_contreras_snail(label="snail",
     inner_timescale = timescale - ((timescale**eps)*h_0)
 
     # We tranpose the angle and time axes so the final shape is [XYZ][Aperture][Time], which is easier to index for mesh
-    outer_mesh = np.transpose(gamma + (outer_timescale * rGC_outer), (0, 2, 1))
-    inner_mesh = np.transpose(gamma + (inner_timescale * rGC), (0, 2, 1))
-
-    # find the indices of the vertices and their faces that will be used for Blender mesh conversion
-    indices = np.array(range(n_points_aperture*n_points_time))
-    inner_indices = indices + (n_points_aperture*n_points_time)
-    index_grid = indices.reshape(n_points_time, n_points_aperture)
-    v1 = index_grid[:, :-1]                       
-    v2 = index_grid[:, 1:]                         
-    v3 = np.roll(index_grid, -1, axis=0)[:, 1:]     
-    v4 = np.roll(index_grid, -1, axis=0)[:, :-1]    
+    outer_mesh = gamma + (outer_timescale * rGC_outer)
+    outer_mesh = np.transpose(outer_mesh, (1, 2, 0))
+    outer_mesh = outer_mesh.reshape(-1, 3).tolist()
     
+    inner_mesh = gamma + (inner_timescale * rGC)
+
     # have inner and outer vertices into one array
-    outer_mesh_vertices = outer_mesh.reshape(3, n_points_aperture*n_points_time)
-    inner_mesh_vertices = inner_mesh.reshape(3, n_points_aperture*n_points_time)
-
-    # Stack the adjusted indices to form faces with vertical wrapping
-    outer_mesh_faces = np.stack((v1, v2, v3, v4), axis=-1).reshape(-1, 4)
-    inner_mesh_faces = outer_mesh_faces + (n_points_aperture*n_points_time)
-    
-
-    vertices = np.concatenate((outer_mesh_vertices, inner_mesh_vertices), axis=1)
-    faces = np.concatenate((outer_mesh_faces, inner_mesh_faces), axis=0)
-
+    #outer_mesh_vertices = outer_mesh.reshape(3, n_points_aperture*n_points_time).T
+    #inner_mesh_vertices = inner_mesh.reshape(3, n_points_aperture*n_points_time).T
 
     # Reshape the inner and outer meshes so their shapes are compatable with Blender
     return {"label": label,
-            "vertices": vertices,
-            "vertex_indices": indices,
-            "face_vertex_indices": faces,
-            "outer_mesh_vertices": outer_mesh_vertices,
-            "inner_mesh_vertices": inner_mesh_vertices,
-            "inner_indices": inner_indices
+            "outer_mesh": outer_mesh,
+            #"outer_mesh_vertices": outer_mesh_vertices,
+            #"inner_mesh_vertices": inner_mesh_vertices
             }
-            
+
+n_points_time=400
+n_points_aperture=10
 
 snail = make_contreras_snail(z = 1.3, a = 1, d=1, phi=0, psi=0,
                              b=.15,
                              n_depth=0, n=0, 
                              c_n=0, c_depth=0,  
-                             time=200, n_points_time=500, 
-                             n_points_aperture=500, 
+                             time=400, n_points_time=n_points_time, 
+                             n_points_aperture=n_points_aperture, 
                              h_0 = 40, eps=.8)
-                             
-                             
-verts = snail['vertices'].T.tolist()
-faces = snail['face_vertex_indices'].tolist()
+
+
+# indexes = np.arange(n_points_aperture*n_points_time)
+# inner_indexes = indexes[(indexes + 1) % n_points_aperture != 0]
+# outer_indexes = np.setdiff1d(indexes, inner_indexes)
+
+# expanded_inner_indexes = np.stack([
+#     inner_indexes,
+#     inner_indexes + 1,
+#     inner_indexes + n_points_aperture,
+#     inner_indexes + n_points_aperture + 1
+# ], axis=1)
+# expanded_outer_indexes = np.stack([
+#     outer_indexes,
+#     (outer_indexes - n_points_aperture) + 1,
+#     outer_indexes + n_points_aperture,
+#     outer_indexes + 1
+# ], axis=1)
+# expanded_indexes = np.concatenate([expanded_inner_indexes, expanded_outer_indexes], axis=0)
+# faces = expanded_indexes.tolist()
+
+outer_verts = snail['outer_mesh']
 label = snail['label']
+
+
+faces = []
+
+# Loop over each point in time, excluding the last row (to prevent out-of-bounds)
+for t in range(n_points_time - 1):
+    # Loop over each aperture point, excluding the last column (to prevent out-of-bounds)
+    for a in range(n_points_aperture - 1):
+        # Calculate the indices of the four vertices for the quad face
+        bottom_left = t * n_points_aperture + a
+        bottom_right = bottom_left + 1
+        top_left = bottom_left + n_points_aperture
+        top_right = top_left + 1
+        
+        # Add the face (quad) as a list of the four vertices
+        faces.append([bottom_left, bottom_right, top_right, top_left])
+
+# Handling wrap-around faces for the last column in each row
+for t in range(n_points_time - 1):
+    bottom_left = t * n_points_aperture + (n_points_aperture - 1)
+    bottom_right = t * n_points_aperture
+    top_left = bottom_left + n_points_aperture
+    top_right = top_left - (n_points_aperture - 1)
+    
+    faces.append([bottom_left, bottom_right, top_right, top_left])
+
+# Wrap-around faces for the last row
+for a in range(n_points_aperture - 1):
+    bottom_left = (n_points_time - 1) * n_points_aperture + a
+    bottom_right = bottom_left + 1
+    top_left = a
+    top_right = a + 1
+    
+    faces.append([bottom_left, bottom_right, top_right, top_left])
+
+# Finally, the corner face connecting the last column of the last row to the first column of the first row
+bottom_left = (n_points_time - 1) * n_points_aperture + (n_points_aperture - 1)
+bottom_right = (n_points_time - 1) * n_points_aperture
+top_left = n_points_aperture - 1
+top_right = 0
+
+faces.append([bottom_left, bottom_right, top_right, top_left])
+
+
 
 
 mesh = bpy.data.meshes.new(f"{label}Mesh")   
 obj = bpy.data.objects.new(label, mesh) 
-mesh.from_pydata(verts, [], faces)   
+mesh.from_pydata(outer_verts, [], faces)   
 mesh.update(calc_edges=True)              
 bpy.context.collection.objects.link(obj) 
 
