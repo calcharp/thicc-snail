@@ -87,20 +87,26 @@ def make_contreras_snail(label="snail",
     return {"label": label,
             "outer_mesh": outer_mesh,
             "inner_mesh": inner_mesh
-            #"outer_mesh_vertices": outer_mesh_vertices,
-            #"inner_mesh_vertices": inner_mesh_vertices
             }
 
-n_points_time=400
-n_points_aperture=50
 
-snail = make_contreras_snail(z = 1.3, a = 1, d=1, phi=0, psi=0,
+if bpy.context.object and bpy.context.object.mode != 'OBJECT':
+    bpy.ops.object.mode_set(mode='OBJECT')
+for obj in bpy.context.scene.objects:
+    bpy.data.objects.remove(obj, do_unlink=True)
+
+time = 50
+n_points_time=1000
+n_points_aperture=20
+eps=.2
+
+snail = make_contreras_snail(z = 0, a = 1, d=1, phi=0, psi=0,
                              b=.15,
-                             n_depth=0, n=0, 
-                             c_n=0, c_depth=0,  
-                             time=100, n_points_time=n_points_time, 
+                             n_depth=.01, n=0, 
+                             c_n=10, c_depth=.1,  
+                             time=time, n_points_time=n_points_time, 
                              n_points_aperture=n_points_aperture, 
-                             h_0 = 40, eps=.8)
+                             h_0 = 40, eps=eps)
 
 
 outer_verts = snail['outer_mesh']
@@ -120,7 +126,6 @@ def add_snail_faces_and_groups(label, outer_verts, inner_verts, n_points_time, n
                 top_right = top_left + 1
                 faces.append([bottom_left, bottom_right, top_right, top_left])
 
-        # Skip faces for the last row in time, effectively leaving it open
         return faces
 
     # Generate faces for both inner and outer meshes without the last row or aperture wrap-around
@@ -151,11 +156,15 @@ def add_snail_faces_and_groups(label, outer_verts, inner_verts, n_points_time, n
     # Assign vertices to respective vertex groups
     outer_group.add(range(len(outer_verts)), 1.0, 'ADD')
     inner_group.add(range(len(outer_verts), len(all_verts)), 1.0, 'ADD')
-    
+
     return obj
 
 
 obj = add_snail_faces_and_groups(label, outer_verts, inner_verts, n_points_time, n_points_aperture)
+
+obj.select_set(True)
+bpy.context.view_layer.objects.active = obj
+
 
 # Apply material (optional, similar to previous setup)
 material = bpy.data.materials.new(name=f"{label}_Material")
