@@ -8,6 +8,9 @@ def make_contreras_snail(label="snail",
                          time = 20, n_points_time = 1000, 
                          n_points_aperture=15):
 
+    time *= np.pi
+    n_points_aperture += 1
+
     # snail axes are [XYZ][Aperture Angle Theta][Time]
     gamma: np.array = np.zeros((3, n_points_time, n_points_aperture))
 
@@ -79,54 +82,65 @@ def make_contreras_snail(label="snail",
     inner_mesh = np.transpose(inner_mesh, (1, 2, 0))
     inner_mesh = inner_mesh.reshape(-1, 3).tolist()
 
-    # have inner and outer vertices into one array
-    #outer_mesh_vertices = outer_mesh.reshape(3, n_points_aperture*n_points_time).T
-    #inner_mesh_vertices = inner_mesh.reshape(3, n_points_aperture*n_points_time).T
+
+
+    u = theta / (2 * np.pi) 
+    v = t / time    
+    u_array = np.tile(u, (n_points_time, 1))     
+    v_array = np.tile(v, (1, n_points_aperture))    
+    uv_array = np.stack((u_array, v_array), axis=2) 
+    uv_coords = uv_array.reshape(-1, 2).tolist()
+
+
+
 
     # Reshape the inner and outer meshes so their shapes are compatable with Blender
     return {"label": label,
             "outer_mesh": outer_mesh,
-            "inner_mesh": inner_mesh
+            "inner_mesh": inner_mesh,
+            "uv_coords": uv_coords
             }
-
 
 if bpy.context.object and bpy.context.object.mode != 'OBJECT':
     bpy.ops.object.mode_set(mode='OBJECT')
 for obj in bpy.context.scene.objects:
     bpy.data.objects.remove(obj, do_unlink=True)
 
-time = 50
-n_points_time=1000
-n_points_aperture=20
-eps=.2
+time = 11
+n_points_time=500
+n_points_aperture=100
+eps=.8
+d = 1
+b = 0.07
+z = -1.5
+h_0 = 0.2
 
-snail = make_contreras_snail(z = 0, a = 1, d=1, phi=0, psi=0,
-                             b=.15,
-                             n_depth=.01, n=0, 
-                             c_n=10, c_depth=.1,  
+snail = make_contreras_snail(z = z, a = 1, d=d, phi=0, psi=0,
+                             b=b,
+                             n_depth=0, n=0, 
+                             c_n=0, c_depth=0,  
                              time=time, n_points_time=n_points_time, 
                              n_points_aperture=n_points_aperture, 
-                             h_0 = 40, eps=eps)
+                             h_0 = h_0, eps=eps)
 
 
 outer_verts = snail['outer_mesh']
 inner_verts = snail['inner_mesh']
 label = snail['label']
+uv_coords = snail['uv_coords'] 
 
-def add_snail_faces_and_groups(label, outer_verts, inner_verts, n_points_time, n_points_aperture):
+def add_snail_faces_and_groups(label, outer_verts, inner_verts, uv_coords, n_points_time, n_points_aperture):
     def create_faces(n_points_time, n_points_aperture):
-        faces = []
-        
-        # Main loop for creating quad faces along the shell, avoiding connections at the last aperture column
-        for t in range(n_points_time - 1):
-            for a in range(n_points_aperture - 1):  # Stop before the last point in aperture to avoid closure
-                bottom_left = t * n_points_aperture + a
-                bottom_right = bottom_left + 1
-                top_left = bottom_left + n_points_aperture
-                top_right = top_left + 1
-                faces.append([bottom_left, bottom_right, top_right, top_left])
 
-        return faces
+        bottom_left = ((np.arange(n_points_time - 1)*n_points_aperture)[:, np.newaxis] + np.arange(n_points_aperture - 1)).flatten()
+        bottom_right = bottom_left + 1
+        top_left = bottom_left + n_points_aperture
+        top_right = top_left + 1
+        faces = np.column_stack((bottom_left, bottom_right, top_right, top_left))
+
+        return faces.tolist()
+    
+    n_points_aperture += 1
 
     # Generate faces for both inner and outer meshes without the last row or aperture wrap-around
     outer_faces = create_faces(n_points_time, n_points_aperture)
@@ -140,6 +154,9 @@ def add_snail_faces_and_groups(label, outer_verts, inner_verts, n_points_time, n
     # Combine outer and inner faces
     all_faces = outer_faces + inner_faces
 
+    # Combine UV coordinates for outer and inner meshes
+    all_uv_coords = uv_coords + uv_coords  # Assuming inner and outer share the same UVs
+
     # Create a new mesh and object in Blender
     mesh = bpy.data.meshes.new(f"{label}Mesh")
     obj = bpy.data.objects.new(label, mesh)
@@ -148,6 +165,15 @@ def add_snail_faces_and_groups(label, outer_verts, inner_verts, n_points_time, n
     # Create the mesh from vertices and faces
     mesh.from_pydata(all_verts, [], all_faces)
     mesh.update(calc_edges=True)
+    
+    # Create UV map
+    uv_layer = mesh.uv_layers.new(name="UVMap")
+    
+    # Assign UVs to loops
+    for loop in mesh.loops:
+        vert_idx = loop.vertex_index
+        uv = all_uv_coords[vert_idx]
+        uv_layer.data[loop.index].uv = uv
 
     # Create vertex groups for outer and inner surfaces
     outer_group = obj.vertex_groups.new(name="outer_surface")
@@ -160,7 +186,7 @@ def add_snail_faces_and_groups(label, outer_verts, inner_verts, n_points_time, n
     return obj
 
 
-obj = add_snail_faces_and_groups(label, outer_verts, inner_verts, n_points_time, n_points_aperture)
+obj = add_snail_faces_and_groups(label, outer_verts, inner_verts, uv_coords, n_points_time, n_points_aperture)
 
 obj.select_set(True)
 bpy.context.view_layer.objects.active = obj
@@ -186,6 +212,9 @@ scaling_factor = 1.0 / current_length_x
 
 # Apply uniform scaling to the entire object in Blender
 obj.scale = (scaling_factor, scaling_factor, scaling_factor)
+
+bpy.ops.object.origin_set(type='ORIGIN_CENTER_OF_MASS', center='BOUNDS')
+obj.location = (0, 0, 0)
 
 # Update the view layer to reflect changes
 bpy.context.view_layer.update()
