@@ -107,8 +107,8 @@ for obj in bpy.context.scene.objects:
     bpy.data.objects.remove(obj, do_unlink=True)
 
 time = 11
-n_points_time=500
-n_points_aperture=100
+n_points_time=3000
+n_points_aperture=1000
 eps=.8
 d = 1
 b = 0.07
