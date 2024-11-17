@@ -14,8 +14,8 @@ class Shell:
         vertex_group_displacement_maps (dict): Dictionary containing displacement maps for each vertex group.
         """
         self.label: str = label
-        self.vertices: list = vertices
-        self.vertex_groups: list = vertex_groups
+        self.vertices: list[tuple[float, float, float]] = vertices
+        self.vertex_groups: dict[str, list[int]] = vertex_groups
         self.vertex_group_UV_maps: dict = vertex_group_UV_maps
         self.vertex_group_displacement_maps: dict = vertex_group_displacement_maps
 
@@ -26,13 +26,14 @@ class Shell:
 
         if self.vertex_groups:
             self.add_vertex_groups()
-            for group_label, _ in self.vertex_groups:
+            for group_label in self.vertex_groups:
                 if group_label in self.vertex_group_UV_maps:
                     self.add_UV_map(group_label)
                 if group_label in self.vertex_group_displacement_maps:
                     self.add_displacement_map(group_label)
                 if group_label in self.vertex_group_UV_maps:
                     self.add_texture(group_label, self.vertex_group_UV_maps[group_label])
+
 
     def create_mesh(self):
         # Create a new mesh and object in Blender with the name self.label
