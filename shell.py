@@ -1,23 +1,27 @@
 import bpy
 import bmesh
+from dataclasses import dataclass
 
+@dataclass
+class VertexGroupData:
+    label: str
+    vertex_indices: list[int]
+    uv_coords: list[tuple[float, float]] = None
+    displacement_map_path: str = None
+  
 class Shell:
-    def __init__(self, label, vertices, vertex_groups, vertex_group_UV_maps, vertex_group_displacement_maps):
+    def __init__(self, label, vertices, vertex_groups_data):
         """
         Initialize a new shell instance.
 
         Parameters:
         label (str): A label for the shell instance.
         vertices (list): A list of vertex coordinates (tuples of x, y, z).
-        vertex_groups (list): A list of vertex groups, where each group is a tuple containing a label and a list of vertex indices.
-        vertex_group_UV_maps (dict): Dictionary containing UV map names for each vertex group.
-        vertex_group_displacement_maps (dict): Dictionary containing displacement maps for each vertex group.
+        vertex_groups_data (list): A list of VertexGroupData instances, each containing information about a vertex group.
         """
         self.label: str = label
         self.vertices: list[tuple[float, float, float]] = vertices
-        self.vertex_groups: dict[str, list[int]] = vertex_groups
-        self.vertex_group_UV_maps: dict = vertex_group_UV_maps
-        self.vertex_group_displacement_maps: dict = vertex_group_displacement_maps
+        self.vertex_groups: list[VertexGroupData] = vertex_groups_data
 
         self.mesh: bpy.types.Mesh = None
         self.object: bpy.types.Object = None
@@ -26,14 +30,13 @@ class Shell:
 
         if self.vertex_groups:
             self.add_vertex_groups()
-            for group_label in self.vertex_groups:
-                if group_label in self.vertex_group_UV_maps:
-                    self.add_UV_map(group_label)
-                if group_label in self.vertex_group_displacement_maps:
-                    self.add_displacement_map(group_label)
-                if group_label in self.vertex_group_UV_maps:
-                    self.add_texture(group_label, self.vertex_group_UV_maps[group_label])
-
+            for group in self.vertex_groups:
+                if group.uv_coords is not None:
+                    self.add_UV_map(group.label)
+                if group.displacement_map_path is not None:
+                    self.add_displacement_map(group.label)
+                if group.uv_coords is not None:
+                    self.add_texture(group.label, group.displacement_map_path)
 
     def create_mesh(self):
         # Create a new mesh and object in Blender with the name self.label
